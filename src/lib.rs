@@ -1,14 +1,22 @@
-pub fn add(left: u64, right: u64) -> u64 {
-    left + right
-}
+#![warn(missing_docs)]
+#![warn(clippy::pedantic)]
 
-#[cfg(test)]
-mod tests {
-    use super::*;
+//! # weave-draft
+//!
+//! `weave-draft` is a crate for representing and manipulating weaving drafts
+//!
+//! ## Crate features
+//!
+//! ### `wif`
+//!
+//! Enable this to convert to the standard `.wif` format
 
-    #[test]
-    fn it_works() {
-        let result = add(2, 2);
-        assert_eq!(result, 4);
-    }
+#[doc(inline)]
+pub use data::Threading;
+
+mod data;
+
+/// Structure holding all elements of a draft
+pub struct Draft {
+    threading: Threading,
 }

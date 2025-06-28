@@ -1,0 +1,30 @@
+default_install_hook_types: [ pre-commit, pre-push, commit-msg ]
+default_stages: [ pre-commit ]
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+      - id: check-added-large-files
+      - id: mixed-line-ending
+        args: [ --fix=lf ]
+  - repo: https://github.com/commitizen-tools/commitizen
+    rev: v4.8.3 # automatically updated by Commitizen
+    hooks:
+      - id: commitizen
+  - repo: local
+    hooks:
+      - id: rust-fmt
+        name: rust fmt
+        entry: cargo-fmt
+        language: rust
+        types: [ rust ]
+        pass_filenames: false
+      - id: clippy
+        name: clippy
+        stages: [ pre-push ]
+        entry: cargo clippy --fix -- -D warnings
+        language: rust
+        pass_filenames: false

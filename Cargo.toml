@@ -10,3 +10,7 @@ keywords = ["weaving", "weave"]
 categories = ["data-structures"]
 
 [dependencies]
+wif-weave = { version = "0.1.2", optional = true}
+
+[features]
+wif = ["wif-weave"]
