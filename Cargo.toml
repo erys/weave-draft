@@ -3,6 +3,6 @@ name = "weave-draft"
 version = "0.1.0"
 edition = "2024"
 description = "A crate for representing and manipulating weaving drafts"
-
+license-file = "LICENSE.txt"
 
 [dependencies]
