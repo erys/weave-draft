@@ -11,6 +11,7 @@
 //!
 //! Enable this to convert to the standard `.wif` format
 
+use crate::data::{Shaft, Treadle};
 #[doc(inline)]
 pub use data::RiseSink;
 #[doc(inline)]
@@ -24,6 +25,8 @@ pub use data::TieUpKind;
 #[doc(inline)]
 pub use data::TreadlingInfo;
 use std::cmp::Ordering;
+use std::collections::HashSet;
+use std::ops::RangeBounds;
 
 mod data;
 
@@ -80,6 +83,12 @@ impl Draft {
         self.treadling.make_sinking();
     }
 
+    /// Goes from a treadling to a lift plan. Returns false if already a lift plan,
+    /// true if conversion happened
+    pub fn make_lift_plan(&mut self) -> bool {
+        self.treadling.make_lift_plan()
+    }
+
     /// Max shaft used in threading or treadling
     #[must_use]
     pub fn max_shaft(&self) -> (WeavingAxis, u32) {
@@ -109,5 +118,164 @@ impl Draft {
         } else {
             Err((axis, max))
         }
+    }
+
+    /// Calls [`Threading::splice`]
+    ///
+    /// # Errors
+    /// See [`Threading::splice`]
+    pub fn splice_threading<R>(&mut self, range: R, replace_with: &[u32]) -> Result<Vec<u32>, usize>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.threading.splice(range, replace_with)
+    }
+
+    /// Adds a new thread to teh end of the threading
+    ///
+    /// # Errors
+    /// Returns the shaft if greater than shaft count
+    pub fn push_threading(&mut self, shaft: u32) -> Result<(), u32> {
+        self.threading.push(shaft)
+    }
+
+    /// Insert a thread in the threading at the given index, shifting the later threads
+    ///
+    /// # Panics
+    /// If index is greater than length
+    ///
+    /// # Errors
+    /// If `shaft` is greater than `shaft_count`
+    pub fn insert_threading(&mut self, shaft: Shaft, index: usize) -> Result<(), Shaft> {
+        self.threading.insert(shaft, index)
+    }
+
+    /// Insert a thread at the given index, shifting later threads
+    ///
+    /// # Errors
+    /// Returns the current length if index is greater than length
+    pub fn try_insert_threading(
+        &mut self,
+        shaft: Shaft,
+        index: usize,
+    ) -> Result<Result<(), Shaft>, usize> {
+        self.threading.try_insert(shaft, index)
+    }
+
+    /// Remove the thread at the given index, returning it as a [Shaft]
+    ///
+    /// # Panics
+    /// If index is out of bounds
+    pub fn remove_threading(&mut self, index: usize) -> Shaft {
+        self.threading.remove(index)
+    }
+
+    /// Get threading shaft at an index
+    #[must_use]
+    pub fn get_from_threading(&self, index: usize) -> Option<&u32> {
+        self.threading.get(index)
+    }
+
+    /// Overwrite thread at given index, returns old thread value
+    ///
+    /// # Panics
+    /// If index is out of bounds
+    pub fn put_threading(&mut self, index: usize, shaft: Shaft) -> Shaft {
+        self.threading.put(index, shaft)
+    }
+
+    /// Overwrite thread at given index. Returns replaced shaft, or none if inserting at the end
+    ///
+    /// # Errors
+    ///
+    /// Returns current length if index out of bounds
+    pub fn try_put_threading(
+        &mut self,
+        index: usize,
+        shaft: Shaft,
+    ) -> Result<Option<Shaft>, usize> {
+        self.threading.try_put(index, shaft)
+    }
+
+    /// See [`Threading::flip_vertical`]
+    pub fn flip_threading_vert(&mut self) {
+        self.threading.flip_vertical();
+    }
+
+    /// See [`Threading::mirror`]
+    pub fn mirror_threading(&mut self) {
+        self.threading.mirror();
+    }
+
+    /// See [`Threading::reverse`]
+    pub fn flip_threading_horiz(&mut self) {
+        self.threading.reverse();
+    }
+
+    /// Add a new pick at the end using just the given treadle
+    ///
+    /// # Errors
+    /// If treadle is higher than number of shafts, returns treadle
+    pub fn push_single_treadling(&mut self, treadle: u32) -> Result<(), u32> {
+        self.treadling.push_single(treadle)
+    }
+
+    /// Add a new pick at the end using all given treadles/shafts
+    ///
+    /// # Errors
+    /// If any treadle is over the number of treadles/shafts, returns that value
+    pub fn push_treadling(&mut self, treadles: HashSet<u32>) -> Result<(), u32> {
+        self.treadling.push(treadles)
+    }
+
+    /// Toggle treadle at given index. Return `true` if treadle has been toggled on, `false` if toggled off
+    ///
+    /// # Errors
+    /// If treadle is invalid
+    /// # Panics
+    /// If index is out of bounds
+    pub fn toggle_treadle(&mut self, index: usize, treadle: Treadle) -> Result<bool, u32> {
+        self.treadling.toggle_treadle(index, treadle)
+    }
+
+    /// Inserts treadling at given index
+    ///
+    /// # Errors
+    /// If any treadles are invalid
+    /// # Panics
+    /// If index is out of bounds
+    pub fn insert_treadle(&mut self, index: usize, treadles: HashSet<u32>) -> Result<(), u32> {
+        self.treadling.insert(index, treadles)
+    }
+
+    /// Based on [`Vec::splice`], it splices the given sequence into the given range. It validates that
+    /// the elements in `replace_with` are inside the shaft bounds, and it returns the replaced elements.
+    ///
+    /// # Errors
+    /// If an element in `replace_with` is larger than the shaft count, returns index of first
+    /// out-of-bounds element
+    pub fn splice_treadling<R>(
+        &mut self,
+        range: R,
+        replace_with: Vec<HashSet<u32>>,
+    ) -> Result<Vec<HashSet<u32>>, u32>
+    where
+        R: RangeBounds<usize>,
+    {
+        self.treadling.splice(range, replace_with)
+    }
+    /// Overwrites the treadling at the given index with the new treadles
+    ///
+    /// # Errors
+    /// If treadling is invalid
+    ///
+    /// # Panics
+    /// If index is greater than the length of the treadling
+    pub fn put_treadling(
+        &mut self,
+        index: usize,
+        treadles: HashSet<u32>,
+    ) -> Result<Option<HashSet<u32>>, u32> {
+        self.treadling.put(index, treadles)
     }
 }

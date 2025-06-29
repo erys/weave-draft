@@ -107,36 +107,52 @@ impl Threading {
     }
 
     /// Add a new thread at the end of the threading
-    pub fn push(&mut self, shaft: u32) {
+    /// # Errors
+    /// Returns the shaft if greater than shaft count
+    pub fn push(&mut self, shaft: u32) -> Result<(), u32> {
+        if shaft > self.shaft_count {
+            return Err(shaft);
+        }
         self.threading.push(shaft);
+        Ok(())
     }
 
     /// Insert a thread at the given index, shifting later threads
     ///
     /// # Panics
     /// If index is greater than the length
-    pub fn insert(&mut self, shaft: Shaft, index: usize) {
+    ///
+    /// # Errors
+    /// If `shaft` is greater than `shaft_count`
+    pub fn insert(&mut self, shaft: Shaft, index: usize) -> Result<(), Shaft> {
+        if shaft.0 > self.shaft_count {
+            return Err(shaft);
+        }
         self.threading.insert(index, shaft.0);
+        Ok(())
     }
 
     /// Insert a thread at the given index, shifting later threads
     ///
     /// # Errors
     /// Returns the current length if index is greater than length
-    pub fn try_insert(&mut self, shaft: Shaft, index: usize) -> Result<(), usize> {
+    pub fn try_insert(&mut self, shaft: Shaft, index: usize) -> Result<Result<(), Shaft>, usize> {
         let len = self.threading.len();
         if index > len {
             Err(len)
         } else {
-            self.insert(shaft, index);
-            Ok(())
+            Ok(self.insert(shaft, index))
         }
     }
 
     /// Remove the thread at the given index, returning it as a [Shaft]
+    ///
+    /// # Panics
+    /// If index is out of bounds
     pub fn remove(&mut self, index: usize) -> Shaft {
         Shaft(self.threading.remove(index))
     }
+
     /// Get shaft at index
     #[must_use]
     pub fn get(&self, index: usize) -> Option<&u32> {
@@ -519,6 +535,72 @@ impl TreadlingInfo {
         }
     }
 
+    /// Inserts treadling at given index
+    ///
+    /// # Errors
+    /// If any treadles are invalid
+    /// # Panics
+    /// If index is out of bounds
+    pub fn insert(&mut self, index: usize, treadles: HashSet<u32>) -> Result<(), u32> {
+        self.validate(&treadles)?;
+        self.treadling.0.insert(index, treadles);
+
+        Ok(())
+    }
+
+    /// Based on [`Vec::splice`], it splices the given sequence into the given range. It validates that
+    /// the elements in `replace_with` are inside the shaft bounds, and it returns the replaced elements.
+    ///
+    /// # Errors
+    /// If an element in `replace_with` is larger than the shaft count, returns index of first
+    /// out-of-bounds element
+    pub fn splice<R>(
+        &mut self,
+        range: R,
+        replace_with: Vec<HashSet<u32>>,
+    ) -> Result<Vec<HashSet<u32>>, u32>
+    where
+        R: RangeBounds<usize>,
+    {
+        for pick in &replace_with {
+            self.validate(pick)?;
+        }
+
+        let replaced: Vec<HashSet<u32>> = self.treadling.0.splice(range, replace_with).collect();
+
+        Ok(replaced)
+    }
+
+    /// Overwrites the treadling at the given index with the new treadles
+    ///
+    /// # Errors
+    /// If treadling is invalid
+    ///
+    /// # Panics
+    /// If index is greater than the length of the treadling
+    pub fn put(
+        &mut self,
+        index: usize,
+        treadles: HashSet<u32>,
+    ) -> Result<Option<HashSet<u32>>, u32> {
+        self.validate(&treadles)?;
+
+        match index.cmp(&self.len()) {
+            Ordering::Less => {
+                let old = self.treadling.0[index].clone();
+                self.treadling.0[index] = treadles;
+                Ok(Some(old))
+            }
+            Ordering::Equal => {
+                self.treadling.0.push(treadles);
+                Ok(None)
+            }
+            Ordering::Greater => {
+                panic!("Index {index} out of bounds")
+            }
+        }
+    }
+
     /// Convert in place to a rising shaft treadling
     pub fn make_rising(&mut self) {
         match self.rise_sink {
@@ -532,6 +614,21 @@ impl TreadlingInfo {
         match self.rise_sink {
             RiseSink::Rising => self.invert(),
             RiseSink::Sinking => (),
+        }
+    }
+
+    /// Goes from a treadling to a lift plan. Returns false if already a lift plan,
+    /// true if conversion happened
+    pub fn make_lift_plan(&mut self) -> bool {
+        match &mut self.tie_up {
+            TieUpKind::Direct => false,
+            TieUpKind::Indirect(tie_up) => {
+                for entry in &mut self.treadling.0 {
+                    *entry = tie_up.compute_shafts(entry);
+                }
+                self.tie_up = TieUpKind::Direct;
+                true
+            }
         }
     }
 
@@ -605,6 +702,28 @@ impl TieUp {
 
     fn max_shaft(&self) -> u32 {
         max_vec_hash(&self.tie_up)
+    }
+
+    /// Returns the shafts tied up to the given treadle. Returns an empty set if treadle is out of bounds
+    ///
+    /// Note: treadles (and shafts) are 1-indexed
+    #[must_use]
+    pub fn get_shafts(&self, treadle: &u32) -> Option<&HashSet<u32>> {
+        self.tie_up.get((treadle - 1) as usize)
+    }
+
+    /// Computes which shafts are raised when given set of treadles are pressed
+    #[must_use]
+    pub fn compute_shafts(&self, treadles: &HashSet<u32>) -> HashSet<u32> {
+        let mut shafts = HashSet::new();
+        for treadle in treadles {
+            if let Some(tied_shafts) = self.get_shafts(treadle) {
+                for shaft in tied_shafts {
+                    shafts.insert(*shaft);
+                }
+            }
+        }
+        shafts
     }
 }
 
