@@ -1,14 +1,15 @@
-//! data module provides data structures used in the [crate::Draft]
+//! data module provides data structures used in the [`crate::Draft`]
 
 use std::cmp::{Ordering, max};
 use std::collections::{HashMap, HashSet};
 use std::iter::Extend;
 use std::ops::{Add, Index, RangeBounds};
 
-/// NewType for shaft
+/// Wrapper for shaft
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Shaft(pub u32);
-/// NewType for Treadle
+
+/// Wrapper for Treadle
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Treadle(pub u32);
 
@@ -28,15 +29,18 @@ impl Index<usize> for Threading {
 }
 
 impl Threading {
-    /// Constructs a new threading, verifying that the shaft_count is respected.
+    /// Constructs a new threading, verifying that the `shaft_count` is respected.
+    ///
     /// # Panics
     /// If there are threads outside the shaft count
+    #[must_use]
     pub fn new(shaft_count: u32, threading: Vec<u32>) -> Self {
-        threading.iter().for_each(|shaft| {
-            if shaft > &shaft_count {
-                panic!("shaft count is {shaft_count} but found shaft {shaft}")
-            }
-        });
+        for shaft in &threading {
+            assert!(
+                shaft <= &shaft_count,
+                "shaft count is {shaft_count} but found shaft {shaft}"
+            );
+        }
 
         Threading {
             shaft_count,
@@ -52,7 +56,7 @@ impl Threading {
         }
     }
 
-    /// Based on [Vec::splice], it splices the given sequence into the given range. It validates that
+    /// Based on [`Vec::splice`], it splices the given sequence into the given range. It validates that
     /// the elements in `replace_with` are inside the shaft bounds, and it returns the replaced elements.
     ///
     /// # Examples
@@ -85,18 +89,26 @@ impl Threading {
     }
 
     /// Number of threads in the threading
+    #[must_use]
     pub fn len(&self) -> usize {
         self.threading.len()
     }
 
+    /// Is the threading empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.threading.is_empty()
+    }
+
     /// Get the raw threading
+    #[must_use]
     pub fn threading(&self) -> &Vec<u32> {
         &self.threading
     }
 
     /// Add a new thread at the end of the threading
     pub fn push(&mut self, shaft: u32) {
-        self.threading.push(shaft)
+        self.threading.push(shaft);
     }
 
     /// Insert a thread at the given index, shifting later threads
@@ -104,7 +116,7 @@ impl Threading {
     /// # Panics
     /// If index is greater than the length
     pub fn insert(&mut self, shaft: Shaft, index: usize) {
-        self.threading.insert(index, shaft.0)
+        self.threading.insert(index, shaft.0);
     }
 
     /// Insert a thread at the given index, shifting later threads
@@ -116,7 +128,8 @@ impl Threading {
         if index > len {
             Err(len)
         } else {
-            Ok(self.insert(shaft, index))
+            self.insert(shaft, index);
+            Ok(())
         }
     }
 
@@ -125,6 +138,7 @@ impl Threading {
         Shaft(self.threading.remove(index))
     }
     /// Get shaft at index
+    #[must_use]
     pub fn get(&self, index: usize) -> Option<&u32> {
         self.threading.get(index)
     }
@@ -157,11 +171,19 @@ impl Threading {
     }
 
     /// Highest used shaft in threading
+    #[must_use]
     pub fn max_shaft(&self) -> u32 {
         let max = self.threading.iter().max();
         *max.unwrap_or(&0)
     }
 
+    /// Non-destructively set shaft count
+    ///
+    /// # Panics
+    /// If `shaft_count` is 0
+    ///
+    /// # Errors
+    /// If `shaft_count` is less than max shaft used
     pub fn set_shaft_count(&mut self, shaft_count: u32) -> Result<(), usize> {
         if shaft_count == 0 {
             panic!("shaft count is 0");
@@ -199,6 +221,7 @@ impl Threading {
     /// # use weave_draft::Threading;
     /// assert_eq!(HashSet::from([1,2,4]), Threading::new(4, vec![4, 1, 2, 1]).used_shafts());
     /// ```
+    #[must_use]
     pub fn used_shafts(&self) -> HashSet<u32> {
         let mut set = HashSet::new();
         for shaft in &self.threading {
@@ -208,14 +231,16 @@ impl Threading {
     }
 
     /// Removes any empty shafts, shifting threads down
+    #[allow(clippy::cast_possible_truncation)]
+    #[allow(clippy::missing_panics_doc)]
     pub fn trim_and_squish_shafts(&mut self) -> &Self {
         let mut used_shafts: Vec<u32> = self.used_shafts().into_iter().collect();
-        used_shafts.sort();
+        used_shafts.sort_unstable();
         self.shaft_count = used_shafts.len() as u32;
         let mapping: HashMap<u32, u32> = used_shafts
             .into_iter()
             .enumerate()
-            .map(|(i, s)| (s, (i + 1) as u32))
+            .map(|(i, s)| (s, i as u32 + 1))
             .collect();
 
         self.threading
@@ -228,8 +253,8 @@ impl Threading {
     /// Flips the threading vertically. On an 8 shaft threading, this means that shaft 1 becomes shaft 8
     /// shaft 2 becomes shaft 7, and so on.
     pub fn flip_vertical(&mut self) -> &Self {
-        for thread in self.threading.iter_mut() {
-            *thread = self.shaft_count - *thread
+        for thread in &mut self.threading {
+            *thread = self.shaft_count - *thread;
         }
         self
     }
@@ -333,7 +358,7 @@ pub struct TreadlingInfo {
 }
 
 /// Options when creating a new [`TieUpKind`]
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TieUpCreate {
     /// Create a direct tie-up
     Direct,
@@ -343,16 +368,16 @@ pub enum TieUpCreate {
 
 impl TreadlingInfo {
     /// Construct new treadling
+    ///
+    /// # Panics
+    /// If shaft or treadle count is 0
+    #[must_use]
     pub fn new(shaft_count: u32, tie_up: TieUpCreate, rise_sink: RiseSink) -> Self {
-        if shaft_count == 0 {
-            panic!("shaft count is 0");
-        }
+        assert_ne!(shaft_count, 0, "shaft count is 0");
         let tie_up = match tie_up {
             TieUpCreate::Direct => TieUpKind::Direct,
             TieUpCreate::Indirect(treadles) => {
-                if treadles == 0 {
-                    panic!("treadle count is 0");
-                }
+                assert_ne!(treadles, 0, "treadle count is 0");
 
                 TieUpKind::Indirect(TieUp {
                     treadle_count: treadles,
@@ -370,6 +395,7 @@ impl TreadlingInfo {
     }
 
     /// Get the shaft count
+    #[must_use]
     pub fn shaft_count(&self) -> u32 {
         self.shaft_count
     }
@@ -377,6 +403,7 @@ impl TreadlingInfo {
     /// Returns max shaft used. If this is a direct tie-up, it's the max shaft in the lift plan. If
     /// it's an indirect tie-up, it's the max shaft used in the tie-up, even if no picks use a treadle
     /// tied to that shaft
+    #[must_use]
     pub fn max_shaft_used(&self) -> u32 {
         match &self.tie_up {
             TieUpKind::Direct => self.treadling.max_shaft(),
@@ -384,6 +411,10 @@ impl TreadlingInfo {
         }
     }
 
+    /// Non-destructively sets shaft count
+    ///
+    /// # Errors
+    /// If `shaft_count` is less than the max shaft used, returns max shaft
     pub fn set_shaft_count(&mut self, shaft_count: u32) -> Result<(), u32> {
         let max = self.max_shaft_used();
         if shaft_count >= max {
@@ -395,11 +426,13 @@ impl TreadlingInfo {
     }
 
     /// Get the tie-up info
+    #[must_use]
     pub fn tie_up(&self) -> &TieUpKind {
         &self.tie_up
     }
 
     /// Get the treadle count. Returns the shaft count if directly tied up
+    #[must_use]
     pub fn treadle_count(&self) -> u32 {
         match self.tie_up {
             TieUpKind::Direct => self.shaft_count,
@@ -408,16 +441,27 @@ impl TreadlingInfo {
     }
 
     /// Whether the treadling is for a rising shaft or sinking shaft loom
+    #[must_use]
     pub fn rise_sink(&self) -> RiseSink {
         self.rise_sink
     }
 
     /// Number of picks in the treadling
+    #[must_use]
     pub fn len(&self) -> usize {
         self.treadling.0.len()
     }
 
+    /// Is the treadling empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.treadling.0.len() == 0
+    }
+
     /// Add a new pick at the end using just the given treadle
+    ///
+    /// # Errors
+    /// If treadle is higher than number of shafts, returns treadle
     pub fn push_single(&mut self, treadle: u32) -> Result<(), u32> {
         if treadle > self.treadle_count() {
             return Err(treadle);
@@ -430,9 +474,9 @@ impl TreadlingInfo {
         Ok(())
     }
 
-    fn validate_treadle(&self, treadle: &u32) -> Result<(), u32> {
-        if treadle == &0 || treadle > &self.treadle_count() {
-            Err(*treadle)
+    fn validate_treadle(&self, treadle: u32) -> Result<(), u32> {
+        if treadle == 0 || treadle > self.treadle_count() {
+            Err(treadle)
         } else {
             Ok(())
         }
@@ -447,6 +491,9 @@ impl TreadlingInfo {
     }
 
     /// Add a new pick at the end using all given treadles/shafts
+    ///
+    /// # Errors
+    /// If any treadle is over the number of treadles/shafts, returns that value
     pub fn push(&mut self, treadles: HashSet<u32>) -> Result<(), u32> {
         self.validate(&treadles)?;
         self.treadling.0.push(treadles);
@@ -461,7 +508,7 @@ impl TreadlingInfo {
     /// # Panics
     /// If index is out of bounds
     pub fn toggle_treadle(&mut self, index: usize, treadle: Treadle) -> Result<bool, u32> {
-        self.validate_treadle(&treadle.0)?;
+        self.validate_treadle(treadle.0)?;
         let pick = &mut self.treadling.0[index];
         if pick.contains(&treadle.0) {
             pick.remove(&treadle.0);
@@ -507,14 +554,10 @@ impl Index<usize> for TreadlingInfo {
 }
 
 fn invert(set: &HashSet<u32>, max: u32) -> HashSet<u32> {
-    if max == 0 {
-        panic!("cannot invert when max is 0")
-    }
-    let inversion = HashSet::from_iter(1..=max);
+    assert_ne!(max, 0, "cannot invert when max is 0");
+    let inversion = (1..=max).collect::<HashSet<u32>>();
 
-    let inversion = &inversion - set;
-
-    inversion
+    &inversion - set
 }
 
 /// Whether the loom is a direct tie-up or whether treadles can be tied to multiple shafts
@@ -528,6 +571,7 @@ pub enum TieUpKind {
 
 impl TieUpKind {
     /// Get [`TieUp`] if indirect
+    #[must_use]
     pub fn tie_up(&self) -> Option<&TieUp> {
         match self {
             TieUpKind::Direct => None,
@@ -536,6 +580,7 @@ impl TieUpKind {
     }
 
     /// Get underlying tie up data if indirect
+    #[must_use]
     pub fn raw_tie_up(&self) -> Option<&Vec<HashSet<u32>>> {
         match self {
             TieUpKind::Direct => None,
@@ -555,7 +600,7 @@ impl TieUp {
     fn invert(&mut self, shaft_count: u32) {
         self.tie_up
             .iter_mut()
-            .for_each(|t| *t = invert(t, shaft_count))
+            .for_each(|t| *t = invert(t, shaft_count));
     }
 
     fn max_shaft(&self) -> u32 {
@@ -574,6 +619,7 @@ pub enum RiseSink {
 
 impl RiseSink {
     /// Swap to other kind
+    #[must_use]
     pub fn invert(self) -> Self {
         match self {
             RiseSink::Rising => Self::Sinking,
@@ -592,7 +638,7 @@ impl Default for RiseSink {
 #[derive(Debug, Clone, PartialEq)]
 pub struct Treadling(Vec<HashSet<u32>>);
 
-fn max_vec_hash(vec: &Vec<HashSet<u32>>) -> u32 {
+fn max_vec_hash(vec: &[HashSet<u32>]) -> u32 {
     *vec.iter()
         .map(|s| s.iter().max().unwrap_or(&0))
         .max()
@@ -605,7 +651,7 @@ impl Treadling {
     }
 
     fn invert(&mut self, shaft_count: u32) {
-        self.0.iter_mut().for_each(|t| *t = invert(t, shaft_count))
+        self.0.iter_mut().for_each(|t| *t = invert(t, shaft_count));
     }
 
     fn max_shaft(&self) -> u32 {
@@ -685,7 +731,7 @@ mod tests {
         assert_eq!(
             threading.trim_and_squish_shafts(),
             &Threading::new(4, vec![1, 2, 3, 4, 2])
-        )
+        );
     }
 
     #[test]

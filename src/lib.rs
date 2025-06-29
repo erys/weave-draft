@@ -44,6 +44,7 @@ pub enum WeavingAxis {
 
 impl Draft {
     /// Create an empty draft with the given options
+    #[must_use]
     pub fn new(shaft_count: u32, tie_up_create: TieUpCreate, rise_sink: RiseSink) -> Self {
         Self {
             threading: Threading::new(shaft_count, Vec::new()),
@@ -52,18 +53,21 @@ impl Draft {
     }
 
     /// Get the threading
+    #[must_use]
     pub fn threading(&self) -> &Threading {
         &self.threading
     }
 
     /// Get the treadling
+    #[must_use]
     pub fn treadling_info(&self) -> &TreadlingInfo {
         &self.treadling
     }
 
     /// Get the tie-up
+    #[must_use]
     pub fn tie_up(&self) -> &TieUpKind {
-        &self.treadling.tie_up()
+        self.treadling.tie_up()
     }
 
     /// Make rising shaft
@@ -77,6 +81,7 @@ impl Draft {
     }
 
     /// Max shaft used in threading or treadling
+    #[must_use]
     pub fn max_shaft(&self) -> (WeavingAxis, u32) {
         let treadling_max = self.treadling.max_shaft_used();
         let threading_max = self.threading.max_shaft();
@@ -92,6 +97,9 @@ impl Draft {
     /// # Errors
     /// If shafts greater than the given count are in use, returns an error with the max used shaft
     /// and the axis it's used on
+    ///
+    /// # Panics
+    /// If shaft count is 0
     pub fn set_shaft_count(&mut self, shaft_count: u32) -> Result<(), (WeavingAxis, u32)> {
         let (axis, max) = self.max_shaft();
         if shaft_count >= max {
