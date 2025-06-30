@@ -11,7 +11,7 @@
 //!
 //! Enable this to convert to the standard `.wif` format
 
-use crate::data::{Shaft, Treadle};
+use crate::data::{Shaft, Treadle, YarnPalette};
 #[doc(inline)]
 pub use data::RiseSink;
 #[doc(inline)]
@@ -35,6 +35,7 @@ pub mod data;
 pub struct Draft {
     threading: Threading,
     treadling: TreadlingInfo,
+    yarn_palette: YarnPalette,
 }
 
 /// An enum representing the axes of a weaving draft
@@ -52,6 +53,7 @@ impl Draft {
         Self {
             threading: Threading::new(shaft_count, Vec::new()),
             treadling: TreadlingInfo::new(shaft_count, tie_up_create, rise_sink),
+            yarn_palette: YarnPalette::default(),
         }
     }
 

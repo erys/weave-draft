@@ -1,7 +1,7 @@
 //! data module provides data structures used in the [`crate::Draft`]
 
 use std::cmp::{Ordering, max};
-use std::collections::{HashMap, HashSet};
+use std::collections::{HashMap, HashSet, hash_set};
 use std::hash::{Hash, Hasher};
 use std::iter::Extend;
 use std::num::FpCategory;
@@ -882,21 +882,82 @@ impl YarnPalette {
         YarnPalette(HashSet::new())
     }
 
+    /// Number of yarns
+    #[must_use]
+    pub fn len(&self) -> usize {
+        self.0.len()
+    }
+
+    /// Is the palette empty
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.0.is_empty()
+    }
+
+    /// Removes yarns that are not used outside the palette and returns a Vec of the removed yarns
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::rc::Rc;
+    /// # use weave_draft::data::{Yarn, YarnPalette};
+    /// let mut palette = YarnPalette::new();
+    /// palette.use_yarn(Yarn::default());
+    /// assert_eq!(palette.remove_unused_yarns(), vec![Yarn::default()]);
+    /// assert_eq!(palette.len(), 0);
+    ///
+    /// let yarn = palette.use_yarn(Yarn::default());
+    /// assert_eq!(palette.remove_unused_yarns(), vec![]);
+    /// assert_eq!(Rc::strong_count(&yarn), 2);
+    /// ```
+    pub fn remove_unused_yarns(&mut self) -> Vec<Yarn> {
+        let mut to_remove = vec![];
+
+        for yarn in &self.0 {
+            if Rc::strong_count(yarn) == 1 {
+                to_remove.push(Rc::clone(yarn));
+            }
+        }
+
+        to_remove
+            .into_iter()
+            .map(|yarn| {
+                self.0.remove(&yarn);
+                // Should have strong count of 1 here
+                Rc::unwrap_or_clone(yarn)
+            })
+            .collect()
+    }
+
     /// Adds yarn to palette if not there. Returns reference to yarn owned by palette
     #[allow(clippy::missing_panics_doc)]
     pub fn use_yarn(&mut self, yarn: Yarn) -> Rc<Yarn> {
         if self.0.contains(&yarn) {
-            self.0.get(&yarn).unwrap().clone()
+            Rc::clone(self.0.get(&yarn).unwrap())
         } else {
             let yarn = Rc::new(yarn);
-            self.0.insert(yarn.clone());
+            self.0.insert(Rc::clone(&yarn));
             yarn
         }
+    }
+
+    /// Borrowing iterator across yarns
+    #[must_use]
+    pub fn iter(&self) -> hash_set::Iter<Rc<Yarn>> {
+        self.0.iter()
+    }
+}
+
+impl<'a> IntoIterator for &'a YarnPalette {
+    type Item = &'a Rc<Yarn>;
+    type IntoIter = hash_set::Iter<'a, Rc<Yarn>>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        self.0.iter()
     }
 }
 
 /// A yarn that is used in the weaving
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Default)]
 pub struct Yarn {
     name: Option<String>,
     color: Color,
@@ -904,7 +965,7 @@ pub struct Yarn {
 }
 
 /// RGB color
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
 pub struct Color(pub u8, pub u8, pub u8);
 
 impl Color {
