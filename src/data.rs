@@ -2,23 +2,46 @@
 
 use std::cmp::{Ordering, max};
 use std::collections::{HashMap, HashSet};
+use std::hash::{Hash, Hasher};
 use std::iter::Extend;
+use std::num::FpCategory;
 use std::ops::{Add, Index, RangeBounds};
+use std::rc::Rc;
 use std::slice::SliceIndex;
 
 /// Wrapper for shaft
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Shaft(pub u32);
 
+impl Default for Shaft {
+    fn default() -> Shaft {
+        Shaft(1)
+    }
+}
+
 /// Wrapper for Treadle
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct Treadle(pub u32);
+impl Default for Treadle {
+    fn default() -> Treadle {
+        Treadle(1)
+    }
+}
 
 /// Threading in a weaving draft. 1 thread can only be on one shaft
 #[derive(Debug, PartialEq, Clone)]
 pub struct Threading {
     shaft_count: u32,
     threading: Vec<u32>,
+}
+
+impl Default for Threading {
+    fn default() -> Threading {
+        Threading {
+            shaft_count: 2,
+            threading: Vec::default(),
+        }
+    }
 }
 
 impl<R> Index<R> for Threading
@@ -377,6 +400,17 @@ pub struct TreadlingInfo {
     treadling: Treadling,
 }
 
+impl Default for TreadlingInfo {
+    fn default() -> Self {
+        TreadlingInfo {
+            shaft_count: 2, // 2 shaft is the minimum meaningful shaft count
+            rise_sink: RiseSink::default(),
+            tie_up: TieUpKind::default(),
+            treadling: Treadling::default(),
+        }
+    }
+}
+
 /// Options when creating a new [`TieUpKind`]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TieUpCreate {
@@ -662,9 +696,10 @@ fn invert(set: &HashSet<u32>, max: u32) -> HashSet<u32> {
 }
 
 /// Whether the loom is a direct tie-up or whether treadles can be tied to multiple shafts
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Default)]
 pub enum TieUpKind {
     /// Direct tie up (table loom, some 4 shaft looms, dobby looms)
+    #[default]
     Direct,
     /// Indirect tie up (most 4+ shaft manual floor looms)
     Indirect(TieUp),
@@ -694,10 +729,20 @@ impl TieUpKind {
 #[derive(Debug, Clone, PartialEq)]
 pub struct TieUp {
     treadle_count: u32,
+    /// Each element in the vector corresponds to one treadle, and the hashset is which shafts it's
+    /// tied to
     tie_up: Vec<HashSet<u32>>,
 }
 
 impl TieUp {
+    /// Create an empty tie up for the given treadle count
+    #[must_use]
+    pub fn new(treadle_count: u32) -> Self {
+        TieUp {
+            treadle_count,
+            tie_up: vec![HashSet::new(); treadle_count as usize],
+        }
+    }
     fn invert(&mut self, shaft_count: u32) {
         self.tie_up
             .iter_mut()
@@ -732,9 +777,10 @@ impl TieUp {
 }
 
 /// Whether this draft is written for a rising shaft or sinking shaft loom
-#[derive(Debug, Clone, PartialEq, Copy)]
+#[derive(Debug, Clone, PartialEq, Copy, Default)]
 pub enum RiseSink {
     /// Rising shaft loom (most US jack looms)
+    #[default]
     Rising,
     /// Sinking shaft loom (counterbalance, direct tie up, etc. looms)
     Sinking,
@@ -751,14 +797,8 @@ impl RiseSink {
     }
 }
 
-impl Default for RiseSink {
-    /// Modern US looms tend to be rising. I am in the US so that's what I'm making the default
-    fn default() -> Self {
-        Self::Rising
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
+/// Treadling/Lift Plan Sequence
+#[derive(Debug, Clone, PartialEq, Default)]
 pub struct Treadling(Vec<HashSet<u32>>);
 
 fn max_vec_hash(vec: &[HashSet<u32>]) -> u32 {
@@ -831,9 +871,152 @@ where
     }
 }
 
+/// Palette of yarns to be used in the weaving
+#[derive(Debug, Clone, PartialEq, Default)]
+pub struct YarnPalette(HashSet<Rc<Yarn>>);
+
+impl YarnPalette {
+    /// Construct a new [`YarnPalette`]
+    #[must_use]
+    pub fn new() -> YarnPalette {
+        YarnPalette(HashSet::new())
+    }
+
+    /// Adds yarn to palette if not there. Returns reference to yarn owned by palette
+    #[allow(clippy::missing_panics_doc)]
+    pub fn use_yarn(&mut self, yarn: Yarn) -> Rc<Yarn> {
+        if self.0.contains(&yarn) {
+            self.0.get(&yarn).unwrap().clone()
+        } else {
+            let yarn = Rc::new(yarn);
+            self.0.insert(yarn.clone());
+            yarn
+        }
+    }
+}
+
+/// A yarn that is used in the weaving
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub struct Yarn {
+    name: Option<String>,
+    color: Color,
+    thickness: Thickness, // todo: Other metadata? Like fiber, source, etc
+}
+
+/// RGB color
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct Color(pub u8, pub u8, pub u8);
+
+impl Color {
+    /// retrieve the red value
+    #[must_use]
+    pub fn r(&self) -> u8 {
+        self.0
+    }
+    /// retrieve the green value
+    #[must_use]
+    pub fn g(&self) -> u8 {
+        self.1
+    }
+    /// retrieve the blue value
+    #[must_use]
+    pub fn b(&self) -> u8 {
+        self.2
+    }
+}
+
+/// Thickness of a yarn
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+pub struct Thickness {
+    display_width: ValidDecimal,
+    threads_per_unit: ValidDecimal,
+    unit: PerUnit,
+}
+
+impl Thickness {
+    /// The width of the thread in the displayed draft
+    #[must_use]
+    pub fn display_width(&self) -> ValidDecimal {
+        self.display_width
+    }
+
+    /// The number of picks/threads per unit
+    #[must_use]
+    pub fn threads_per_unit(&self) -> ValidDecimal {
+        self.threads_per_unit
+    }
+
+    /// Unit to be used when calculated picks/thread per inch/centimeter
+    #[must_use]
+    pub fn unit(&self) -> PerUnit {
+        self.unit
+    }
+}
+
+/// Float wrapper that guarantees the value is `0` or a positive [`Normal`][FpCategory::Normal] float.
+/// This allows for a full [`Eq`] and hash
+#[derive(Clone, Copy, Debug, PartialEq, PartialOrd)]
+pub struct ValidDecimal(f64);
+
+impl ValidDecimal {
+    /// Constructs a [`ValidDecimal`]
+    /// # Panics
+    /// If the value is infinite, NaN, Negative, or Subnormal
+    #[must_use]
+    pub fn new(value: f64) -> ValidDecimal {
+        match value.classify() {
+            FpCategory::Nan | FpCategory::Infinite | FpCategory::Subnormal => {
+                panic!("Invalid decimal {value}")
+            }
+            FpCategory::Normal if value < 0.0 => panic!("Negative decimal {value}"),
+            _ => ValidDecimal(value),
+        }
+    }
+}
+
+impl Eq for ValidDecimal {}
+
+impl Hash for ValidDecimal {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        self.0.to_bits().hash(state);
+    }
+}
+
+impl Default for ValidDecimal {
+    fn default() -> Self {
+        Self(1.0)
+    }
+}
+
+/// Unit used in weaving
+#[derive(Clone, Debug, PartialEq, Copy, Eq, Hash, Default)]
+pub enum PerUnit {
+    /// Inches
+    #[default]
+    Inch,
+    /// Centimeters
+    Centimeter,
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn test_palette_borrows() {
+        let mut palette = YarnPalette::new();
+        let yarn = palette.use_yarn(Yarn {
+            name: None,
+            color: Color(0, 0, 0),
+            thickness: Thickness::default(),
+        });
+        let yarn2 = palette.use_yarn(Yarn {
+            name: None,
+            color: Color(255, 255, 255),
+            thickness: Thickness::default(),
+        });
+        assert_ne!(yarn, yarn2);
+    }
 
     #[test]
     #[should_panic(expected = "shaft count is 2 but found shaft 3")]

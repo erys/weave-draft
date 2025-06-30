@@ -28,7 +28,7 @@ use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ops::RangeBounds;
 
-mod data;
+pub mod data;
 
 /// Structure holding all elements of a draft
 #[derive(Clone, Debug, PartialEq)]
