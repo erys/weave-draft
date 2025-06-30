@@ -4,6 +4,7 @@ use std::cmp::{Ordering, max};
 use std::collections::{HashMap, HashSet};
 use std::iter::Extend;
 use std::ops::{Add, Index, RangeBounds};
+use std::slice::SliceIndex;
 
 /// Wrapper for shaft
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -20,10 +21,13 @@ pub struct Threading {
     threading: Vec<u32>,
 }
 
-impl Index<usize> for Threading {
-    type Output = u32;
+impl<R> Index<R> for Threading
+where
+    R: SliceIndex<[u32]>,
+{
+    type Output = R::Output;
 
-    fn index(&self, index: usize) -> &Self::Output {
+    fn index(&self, index: R) -> &Self::Output {
         &self.threading[index]
     }
 }
@@ -817,9 +821,12 @@ impl Add<Treadling> for &Treadling {
     }
 }
 
-impl Index<usize> for Treadling {
-    type Output = HashSet<u32>;
-    fn index(&self, index: usize) -> &Self::Output {
+impl<S> Index<S> for Treadling
+where
+    S: SliceIndex<[HashSet<u32>]>,
+{
+    type Output = S::Output;
+    fn index(&self, index: S) -> &Self::Output {
         &self.0[index]
     }
 }
@@ -842,6 +849,24 @@ mod tests {
             threading_1 + threading_2,
             Threading::new(6, vec![1, 2, 3, 4, 3, 4, 5, 6, 1])
         );
+    }
+
+    #[test]
+    fn test_thread_indexing() {
+        let threading = Threading::new(4, vec![1, 2, 3, 4]);
+        assert_eq!(threading[0], 1);
+        assert_eq!(threading[0..1], [1]);
+    }
+
+    #[test]
+    fn test_treadling_indexing() {
+        let treadling = Treadling(vec![
+            HashSet::from([1]),
+            HashSet::from([2]),
+            HashSet::from([3]),
+        ]);
+        assert_eq!(treadling[0], HashSet::from([1]));
+        assert_eq!(treadling[..2], [HashSet::from([1]), HashSet::from([2])]);
     }
 
     #[test]
