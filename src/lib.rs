@@ -1,5 +1,7 @@
 #![warn(missing_docs)]
 #![warn(clippy::pedantic)]
+#![warn(clippy::cargo)]
+#![warn(clippy::nursery)]
 
 //! # weave-draft
 //!
@@ -36,7 +38,7 @@ use std::rc::Rc;
 pub mod data;
 
 /// Structure holding all elements of a draft
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Draft {
     threading: Threading,
     treadling: TreadlingInfo,
@@ -68,19 +70,19 @@ impl Draft {
 
     /// Get the threading
     #[must_use]
-    pub fn threading(&self) -> &Threading {
+    pub const fn threading(&self) -> &Threading {
         &self.threading
     }
 
     /// Get the treadling
     #[must_use]
-    pub fn treadling_info(&self) -> &TreadlingInfo {
+    pub const fn treadling_info(&self) -> &TreadlingInfo {
         &self.treadling
     }
 
     /// Get the tie-up
     #[must_use]
-    pub fn tie_up(&self) -> &TieUpKind {
+    pub const fn tie_up(&self) -> &TieUpKind {
         self.treadling.tie_up()
     }
 
@@ -296,19 +298,19 @@ impl Draft {
 
     /// Get yarn palette
     #[must_use]
-    pub fn yarn_palette(&self) -> &YarnPalette {
+    pub const fn yarn_palette(&self) -> &YarnPalette {
         &self.yarn_palette
     }
 
     /// Get weft yarns
     #[must_use]
-    pub fn weft_yarns(&self) -> &YarnSequence {
+    pub const fn weft_yarns(&self) -> &YarnSequence {
         &self.weft_yarns
     }
 
     /// Get warp yarns
     #[must_use]
-    pub fn warp_yarns(&self) -> &YarnSequence {
+    pub const fn warp_yarns(&self) -> &YarnSequence {
         &self.warp_yarns
     }
 
@@ -322,7 +324,7 @@ impl Draft {
     }
 
     /// set weft yarn repeat offset
-    pub fn set_weft_yarn_offset(&mut self, offset: usize) {
+    pub const fn set_weft_yarn_offset(&mut self, offset: usize) {
         self.weft_yarns.set_offset(offset);
     }
 
@@ -356,7 +358,7 @@ impl Draft {
     }
 
     /// set warp yarn repeat offset
-    pub fn set_warp_yarn_offset(&mut self, offset: usize) {
+    pub const fn set_warp_yarn_offset(&mut self, offset: usize) {
         self.warp_yarns.set_offset(offset);
     }
 

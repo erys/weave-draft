@@ -11,34 +11,34 @@ use std::rc::Rc;
 use std::slice::SliceIndex;
 
 /// Wrapper for shaft
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Shaft(pub usize);
 
 impl Default for Shaft {
-    fn default() -> Shaft {
-        Shaft(1)
+    fn default() -> Self {
+        Self(1)
     }
 }
 
 /// Wrapper for Treadle
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct Treadle(pub usize);
 impl Default for Treadle {
-    fn default() -> Treadle {
-        Treadle(1)
+    fn default() -> Self {
+        Self(1)
     }
 }
 
 /// Threading in a weaving draft. 1 thread can only be on one shaft
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct Threading {
     shaft_count: usize,
     threading: Vec<usize>,
 }
 
 impl Default for Threading {
-    fn default() -> Threading {
-        Threading {
+    fn default() -> Self {
+        Self {
             shaft_count: 2,
             threading: Vec::default(),
         }
@@ -70,7 +70,7 @@ impl Threading {
             );
         }
 
-        Threading {
+        Self {
             shaft_count,
             threading,
         }
@@ -78,10 +78,7 @@ impl Threading {
 
     fn validate(&self, other: &[usize]) -> Result<(), usize> {
         let index = other.iter().position(|s| s > &self.shaft_count);
-        match index {
-            None => Ok(()),
-            Some(i) => Err(i),
-        }
+        index.map_or(Ok(()), Err)
     }
 
     /// Based on [`Vec::splice`], it splices the given sequence into the given range. It validates that
@@ -118,19 +115,19 @@ impl Threading {
 
     /// Number of threads in the threading
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.threading.len()
     }
 
     /// Is the threading empty
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.threading.is_empty()
     }
 
     /// Get the raw threading
     #[must_use]
-    pub fn threading(&self) -> &Vec<usize> {
+    pub const fn threading(&self) -> &Vec<usize> {
         &self.threading
     }
 
@@ -368,21 +365,21 @@ impl Add for Threading {
         let mut threading = self.threading;
         threading.extend(rhs.threading);
 
-        Threading {
+        Self {
             shaft_count: max(self.shaft_count, rhs.shaft_count),
             threading,
         }
     }
 }
 
-impl Add<&Threading> for Threading {
-    type Output = Threading;
+impl Add<&Self> for Threading {
+    type Output = Self;
 
-    fn add(self, rhs: &Threading) -> Self::Output {
+    fn add(self, rhs: &Self) -> Self::Output {
         let mut threading = self.threading;
         threading.extend(&rhs.threading);
 
-        Threading {
+        Self {
             shaft_count: max(self.shaft_count, rhs.shaft_count),
             threading,
         }
@@ -391,7 +388,7 @@ impl Add<&Threading> for Threading {
 
 /// The treadling or lift plan for a draft, also includes the tie-up and whether the loom is rising
 /// or sinking shed
-#[derive(Debug, PartialEq, Clone)]
+#[derive(Debug, PartialEq, Eq, Clone)]
 pub struct TreadlingInfo {
     shaft_count: usize,
     rise_sink: RiseSink,
@@ -401,7 +398,7 @@ pub struct TreadlingInfo {
 
 impl Default for TreadlingInfo {
     fn default() -> Self {
-        TreadlingInfo {
+        Self {
             shaft_count: 2, // 2 shaft is the minimum meaningful shaft count
             rise_sink: RiseSink::default(),
             tie_up: TieUpKind::default(),
@@ -411,7 +408,7 @@ impl Default for TreadlingInfo {
 }
 
 /// Options when creating a new [`TieUpKind`]
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TieUpCreate {
     /// Create a direct tie-up
     Direct,
@@ -439,7 +436,7 @@ impl TreadlingInfo {
             }
         };
 
-        TreadlingInfo {
+        Self {
             shaft_count,
             tie_up,
             treadling: Treadling::new(),
@@ -449,7 +446,7 @@ impl TreadlingInfo {
 
     /// Get the shaft count
     #[must_use]
-    pub fn shaft_count(&self) -> usize {
+    pub const fn shaft_count(&self) -> usize {
         self.shaft_count
     }
 
@@ -480,13 +477,13 @@ impl TreadlingInfo {
 
     /// Get the tie-up info
     #[must_use]
-    pub fn tie_up(&self) -> &TieUpKind {
+    pub const fn tie_up(&self) -> &TieUpKind {
         &self.tie_up
     }
 
     /// Get the treadle count. Returns the shaft count if directly tied up
     #[must_use]
-    pub fn treadle_count(&self) -> usize {
+    pub const fn treadle_count(&self) -> usize {
         match self.tie_up {
             TieUpKind::Direct => self.shaft_count,
             TieUpKind::Indirect(TieUp { treadle_count, .. }) => treadle_count,
@@ -495,19 +492,19 @@ impl TreadlingInfo {
 
     /// Whether the treadling is for a rising shaft or sinking shaft loom
     #[must_use]
-    pub fn rise_sink(&self) -> RiseSink {
+    pub const fn rise_sink(&self) -> RiseSink {
         self.rise_sink
     }
 
     /// Number of picks in the treadling
     #[must_use]
-    pub fn len(&self) -> usize {
+    pub const fn len(&self) -> usize {
         self.treadling.0.len()
     }
 
     /// Is the treadling empty
     #[must_use]
-    pub fn is_empty(&self) -> bool {
+    pub const fn is_empty(&self) -> bool {
         self.treadling.0.len() == 0
     }
 
@@ -527,7 +524,7 @@ impl TreadlingInfo {
         Ok(())
     }
 
-    fn validate_treadle(&self, treadle: usize) -> Result<(), usize> {
+    const fn validate_treadle(&self, treadle: usize) -> Result<(), usize> {
         if treadle == 0 || treadle > self.treadle_count() {
             Err(treadle)
         } else {
@@ -695,7 +692,7 @@ fn invert(set: &HashSet<usize>, max: usize) -> HashSet<usize> {
 }
 
 /// Whether the loom is a direct tie-up or whether treadles can be tied to multiple shafts
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub enum TieUpKind {
     /// Direct tie up (table loom, some 4 shaft looms, dobby looms)
     #[default]
@@ -707,25 +704,25 @@ pub enum TieUpKind {
 impl TieUpKind {
     /// Get [`TieUp`] if indirect
     #[must_use]
-    pub fn tie_up(&self) -> Option<&TieUp> {
+    pub const fn tie_up(&self) -> Option<&TieUp> {
         match self {
-            TieUpKind::Direct => None,
-            TieUpKind::Indirect(tie_up) => Some(tie_up),
+            Self::Direct => None,
+            Self::Indirect(tie_up) => Some(tie_up),
         }
     }
 
     /// Get underlying tie up data if indirect
     #[must_use]
-    pub fn raw_tie_up(&self) -> Option<&Vec<HashSet<usize>>> {
+    pub const fn raw_tie_up(&self) -> Option<&Vec<HashSet<usize>>> {
         match self {
-            TieUpKind::Direct => None,
-            TieUpKind::Indirect(tie_up) => Some(&tie_up.tie_up),
+            Self::Direct => None,
+            Self::Indirect(tie_up) => Some(&tie_up.tie_up),
         }
     }
 }
 
 /// A tie-up of a loom
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct TieUp {
     treadle_count: usize,
     /// Each element in the vector corresponds to one treadle, and the hashset is which shafts it's
@@ -737,7 +734,7 @@ impl TieUp {
     /// Create an empty tie up for the given treadle count
     #[must_use]
     pub fn new(treadle_count: usize) -> Self {
-        TieUp {
+        Self {
             treadle_count,
             tie_up: vec![HashSet::new(); treadle_count],
         }
@@ -776,7 +773,7 @@ impl TieUp {
 }
 
 /// Whether this draft is written for a rising shaft or sinking shaft loom
-#[derive(Debug, Clone, PartialEq, Copy, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Copy, Default)]
 pub enum RiseSink {
     /// Rising shaft loom (most US jack looms)
     #[default]
@@ -788,16 +785,16 @@ pub enum RiseSink {
 impl RiseSink {
     /// Swap to other kind
     #[must_use]
-    pub fn invert(self) -> Self {
+    pub const fn invert(self) -> Self {
         match self {
-            RiseSink::Rising => Self::Sinking,
-            RiseSink::Sinking => Self::Rising,
+            Self::Rising => Self::Sinking,
+            Self::Sinking => Self::Rising,
         }
     }
 }
 
 /// Treadling/Lift Plan Sequence
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct Treadling(Vec<HashSet<usize>>);
 
 fn max_vec_hash(vec: &[HashSet<usize>]) -> usize {
@@ -808,8 +805,8 @@ fn max_vec_hash(vec: &[HashSet<usize>]) -> usize {
 }
 
 impl Treadling {
-    fn new() -> Treadling {
-        Treadling(Vec::new())
+    const fn new() -> Self {
+        Self(Vec::new())
     }
 
     fn invert(&mut self, shaft_count: usize) {
@@ -822,22 +819,22 @@ impl Treadling {
 }
 
 impl Add for Treadling {
-    type Output = Treadling;
+    type Output = Self;
 
     fn add(self, rhs: Self) -> Self::Output {
         let mut new = self.0;
         new.extend(rhs.0);
-        Treadling(new)
+        Self(new)
     }
 }
 
-impl Add<&Treadling> for Treadling {
-    type Output = Treadling;
-    fn add(self, rhs: &Treadling) -> Self::Output {
+impl Add<&Self> for Treadling {
+    type Output = Self;
+    fn add(self, rhs: &Self) -> Self::Output {
         let mut new = self.0;
         new.extend_from_slice(&rhs.0);
 
-        Treadling(new)
+        Self(new)
     }
 }
 
@@ -871,14 +868,14 @@ where
 }
 
 /// Palette of yarns to be used in the weaving
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct YarnPalette(HashSet<Rc<Yarn>>);
 
 impl YarnPalette {
     /// Construct a new [`YarnPalette`]
     #[must_use]
-    pub fn new() -> YarnPalette {
-        YarnPalette(HashSet::new())
+    pub fn new() -> Self {
+        Self(HashSet::new())
     }
 
     /// Number of yarns
@@ -972,19 +969,19 @@ pub struct Yarn {
 impl Yarn {
     /// Get name
     #[must_use]
-    pub fn name(&self) -> &Option<String> {
+    pub const fn name(&self) -> &Option<String> {
         &self.name
     }
 
     /// Get color
     #[must_use]
-    pub fn color(&self) -> &Color {
+    pub const fn color(&self) -> &Color {
         &self.color
     }
 
     /// Get Thickness
     #[must_use]
-    pub fn thickness(&self) -> &Thickness {
+    pub const fn thickness(&self) -> &Thickness {
         &self.thickness
     }
 
@@ -994,12 +991,12 @@ impl Yarn {
     }
 
     /// Set color
-    pub fn set_color(&mut self, color: Color) {
+    pub const fn set_color(&mut self, color: Color) {
         self.color = color;
     }
 
     /// Set thickness
-    pub fn set_thickness(&mut self, thickness: Thickness) {
+    pub const fn set_thickness(&mut self, thickness: Thickness) {
         self.thickness = thickness;
     }
 }
@@ -1011,17 +1008,17 @@ pub struct Color(pub u8, pub u8, pub u8);
 impl Color {
     /// retrieve the red value
     #[must_use]
-    pub fn r(&self) -> u8 {
+    pub const fn r(&self) -> u8 {
         self.0
     }
     /// retrieve the green value
     #[must_use]
-    pub fn g(&self) -> u8 {
+    pub const fn g(&self) -> u8 {
         self.1
     }
     /// retrieve the blue value
     #[must_use]
-    pub fn b(&self) -> u8 {
+    pub const fn b(&self) -> u8 {
         self.2
     }
 }
@@ -1037,19 +1034,19 @@ pub struct Thickness {
 impl Thickness {
     /// The width of the thread in the displayed draft
     #[must_use]
-    pub fn display_width(&self) -> ValidDecimal {
+    pub const fn display_width(&self) -> ValidDecimal {
         self.display_width
     }
 
     /// The number of picks/threads per unit
     #[must_use]
-    pub fn threads_per_unit(&self) -> ValidDecimal {
+    pub const fn threads_per_unit(&self) -> ValidDecimal {
         self.threads_per_unit
     }
 
     /// Unit to be used when calculated picks/thread per inch/centimeter
     #[must_use]
-    pub fn unit(&self) -> PerUnit {
+    pub const fn unit(&self) -> PerUnit {
         self.unit
     }
 }
@@ -1064,13 +1061,13 @@ impl ValidDecimal {
     /// # Panics
     /// If the value is infinite, NaN, Negative, or Subnormal
     #[must_use]
-    pub fn new(value: f64) -> ValidDecimal {
+    pub fn new(value: f64) -> Self {
         match value.classify() {
             FpCategory::Nan | FpCategory::Infinite | FpCategory::Subnormal => {
                 panic!("Invalid decimal {value}")
             }
             FpCategory::Normal if value < 0.0 => panic!("Negative decimal {value}"),
-            _ => ValidDecimal(value),
+            _ => Self(value),
         }
     }
 }
@@ -1100,7 +1097,7 @@ pub enum PerUnit {
 }
 
 /// Repeating sequence of yarns used in the warp or weft
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct YarnRepeat {
     offset: usize, // which color in the sequence to start on
     sequence: Vec<Rc<Yarn>>,
@@ -1119,7 +1116,7 @@ impl YarnRepeat {
     }
 
     /// Set the offset, returns old offset
-    pub fn set_offset(&mut self, offset: usize) -> usize {
+    pub const fn set_offset(&mut self, offset: usize) -> usize {
         mem::replace(&mut self.offset, offset)
     }
 
@@ -1165,19 +1162,19 @@ impl YarnRepeat {
 
     /// get offset
     #[must_use]
-    pub fn offset(&self) -> usize {
+    pub const fn offset(&self) -> usize {
         self.offset
     }
 
     /// get sequence
     #[must_use]
-    pub fn sequence(&self) -> &Vec<Rc<Yarn>> {
+    pub const fn sequence(&self) -> &Vec<Rc<Yarn>> {
         &self.sequence
     }
 }
 
 /// Yarns used in the warp or weft
-#[derive(Clone, Debug, PartialEq, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 pub struct YarnSequence {
     default_sequence: YarnRepeat,
     exceptions: HashMap<usize, Rc<Yarn>>,
@@ -1186,13 +1183,13 @@ pub struct YarnSequence {
 impl YarnSequence {
     /// get sequence
     #[must_use]
-    pub fn default_sequence(&self) -> &YarnRepeat {
+    pub const fn default_sequence(&self) -> &YarnRepeat {
         &self.default_sequence
     }
 
     /// get exceptions to sequence
     #[must_use]
-    pub fn exceptions(&self) -> &HashMap<usize, Rc<Yarn>> {
+    pub const fn exceptions(&self) -> &HashMap<usize, Rc<Yarn>> {
         &self.exceptions
     }
 
@@ -1207,7 +1204,7 @@ impl YarnSequence {
     }
 
     /// Set the repeat offset
-    pub fn set_offset(&mut self, offset: usize) -> usize {
+    pub const fn set_offset(&mut self, offset: usize) -> usize {
         self.default_sequence.set_offset(offset)
     }
 
