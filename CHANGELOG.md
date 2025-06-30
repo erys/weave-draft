@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.2.0](https://github.com/erys/weave-draft/compare/v0.1.0...v0.2.0) - 2025-06-30
+
+### Added
+
+- yarn sequences
+- utility methods for yarn palette
+- add structs for color/thickness
+- more flexible indexing
+
 ## [0.1.0](https://github.com/erys/weave-draft/compare/v0.0.0...v0.1.0) - 2025-06-29
 
 ### Added
