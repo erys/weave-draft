@@ -11,7 +11,7 @@
 //!
 //! Enable this to convert to the standard `.wif` format
 
-use crate::data::{Shaft, Treadle, YarnPalette};
+use crate::data::{Shaft, Treadle, YarnSequence};
 #[doc(inline)]
 pub use data::RiseSink;
 #[doc(inline)]
@@ -24,9 +24,14 @@ pub use data::TieUpCreate;
 pub use data::TieUpKind;
 #[doc(inline)]
 pub use data::TreadlingInfo;
+#[doc(inline)]
+pub use data::Yarn;
+#[doc(inline)]
+pub use data::YarnPalette;
 use std::cmp::Ordering;
 use std::collections::HashSet;
 use std::ops::RangeBounds;
+use std::rc::Rc;
 
 pub mod data;
 
@@ -36,6 +41,8 @@ pub struct Draft {
     threading: Threading,
     treadling: TreadlingInfo,
     yarn_palette: YarnPalette,
+    weft_yarns: YarnSequence,
+    warp_yarns: YarnSequence,
 }
 
 /// An enum representing the axes of a weaving draft
@@ -54,6 +61,8 @@ impl Draft {
             threading: Threading::new(shaft_count, Vec::new()),
             treadling: TreadlingInfo::new(shaft_count, tie_up_create, rise_sink),
             yarn_palette: YarnPalette::default(),
+            weft_yarns: YarnSequence::default(),
+            warp_yarns: YarnSequence::default(),
         }
     }
 
@@ -279,5 +288,91 @@ impl Draft {
         treadles: HashSet<u32>,
     ) -> Result<Option<HashSet<u32>>, u32> {
         self.treadling.put(index, treadles)
+    }
+
+    /// Get yarn palette
+    #[must_use]
+    pub fn yarn_palette(&self) -> &YarnPalette {
+        &self.yarn_palette
+    }
+
+    /// Get weft yarns
+    #[must_use]
+    pub fn weft_yarns(&self) -> &YarnSequence {
+        &self.weft_yarns
+    }
+
+    /// Get warp yarns
+    #[must_use]
+    pub fn warp_yarns(&self) -> &YarnSequence {
+        &self.warp_yarns
+    }
+
+    /// Set the repeat of weft yarns
+    pub fn set_weft_yarn_repeat<T>(&mut self, yarns: T)
+    where
+        T: IntoIterator<Item = Yarn>,
+    {
+        let yarns = self.yarn_palette.use_yarns(yarns);
+        self.weft_yarns.set_repeat(&yarns);
+    }
+
+    /// set weft yarn repeat offset
+    pub fn set_weft_yarn_offset(&mut self, offset: usize) {
+        self.weft_yarns.set_offset(offset);
+    }
+
+    /// set weft yarn at index
+    pub fn set_weft_yarn(&mut self, index: usize, yarn: Yarn) {
+        let yarn = self.yarn_palette.use_yarn(yarn);
+        self.weft_yarns.set_yarn(index, yarn);
+    }
+
+    /// Get weft yarn at index. Returns `None` if not set via repeat or directly
+    #[must_use]
+    pub fn try_get_weft_yarn(&self, index: usize) -> Option<&Rc<Yarn>> {
+        self.weft_yarns.try_get(index)
+    }
+
+    /// Get weft yarn at index
+    /// # Panics
+    /// If yarn is not set via repeat or directly
+    #[must_use]
+    pub fn get_weft_yarn(&self, index: usize) -> &Rc<Yarn> {
+        self.weft_yarns.get(index)
+    }
+
+    /// Set the repeat of weft yarns
+    pub fn set_warp_yarn_repeat<T>(&mut self, yarns: T)
+    where
+        T: IntoIterator<Item = Yarn>,
+    {
+        let yarns = self.yarn_palette.use_yarns(yarns);
+        self.warp_yarns.set_repeat(&yarns);
+    }
+
+    /// set warp yarn repeat offset
+    pub fn set_warp_yarn_offset(&mut self, offset: usize) {
+        self.warp_yarns.set_offset(offset);
+    }
+
+    /// set warp yarn at index
+    pub fn set_warp_yarn(&mut self, index: usize, yarn: Yarn) {
+        let yarn = self.yarn_palette.use_yarn(yarn);
+        self.warp_yarns.set_yarn(index, yarn);
+    }
+
+    /// Get warp yarn at index. Returns `None` if not set via repeat or directly
+    #[must_use]
+    pub fn try_get_warp_yarn(&self, index: usize) -> Option<&Rc<Yarn>> {
+        self.warp_yarns.try_get(index)
+    }
+
+    /// Get warp yarn at index
+    /// # Panics
+    /// If yarn is not set via repeat or directly
+    #[must_use]
+    pub fn get_warp_yarn(&self, index: usize) -> &Rc<Yarn> {
+        self.warp_yarns.get(index)
     }
 }

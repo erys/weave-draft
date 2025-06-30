@@ -940,6 +940,14 @@ impl YarnPalette {
         }
     }
 
+    /// Add multiple yarns to the palette. Returned `Vec` is in the same order as the input
+    pub fn use_yarns<T>(&mut self, yarns: T) -> Vec<Rc<Yarn>>
+    where
+        T: IntoIterator<Item = Yarn>,
+    {
+        yarns.into_iter().map(|yarn| self.use_yarn(yarn)).collect()
+    }
+
     /// Borrowing iterator across yarns
     #[must_use]
     pub fn iter(&self) -> hash_set::Iter<Rc<Yarn>> {
@@ -962,6 +970,41 @@ pub struct Yarn {
     name: Option<String>,
     color: Color,
     thickness: Thickness, // todo: Other metadata? Like fiber, source, etc
+}
+
+impl Yarn {
+    /// Get name
+    #[must_use]
+    pub fn name(&self) -> &Option<String> {
+        &self.name
+    }
+
+    /// Get color
+    #[must_use]
+    pub fn color(&self) -> &Color {
+        &self.color
+    }
+
+    /// Get Thickness
+    #[must_use]
+    pub fn thickness(&self) -> &Thickness {
+        &self.thickness
+    }
+
+    /// Set name
+    pub fn set_name(&mut self, name: Option<String>) {
+        self.name = name;
+    }
+
+    /// Set color
+    pub fn set_color(&mut self, color: Color) {
+        self.color = color;
+    }
+
+    /// Set thickness
+    pub fn set_thickness(&mut self, thickness: Thickness) {
+        self.thickness = thickness;
+    }
 }
 
 /// RGB color
@@ -1057,6 +1100,150 @@ pub enum PerUnit {
     Inch,
     /// Centimeters
     Centimeter,
+}
+
+/// Repeating sequence of yarns used in the warp or weft
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct YarnRepeat {
+    offset: usize, // which color in the sequence to start on
+    sequence: Vec<Rc<Yarn>>,
+}
+
+impl YarnRepeat {
+    /// Empty yarn repeat
+    #[must_use]
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    /// Set the repat
+    pub fn set_sequence(&mut self, sequence: &[Rc<Yarn>]) {
+        self.sequence = sequence.iter().map(Rc::clone).collect();
+    }
+
+    /// Set the offset
+    pub fn set_offset(&mut self, offset: usize) {
+        self.offset = offset;
+    }
+
+    /// Gets the appropriate yarn for the given index, returns `None` if the sequence is empty
+    ///
+    /// # Examples
+    /// ```
+    /// # use std::rc::Rc;
+    /// # use weave_draft::data::{Color, Yarn, YarnRepeat};
+    /// let mut seq = YarnRepeat::new();
+    /// assert_eq!(seq.try_get(1), None);
+    ///
+    /// let yarn_1 = Rc::new(Yarn::default());
+    /// let mut yarn_2 = Yarn::default();
+    /// yarn_2.set_color(Color(255,255,255));
+    /// let yarn_2 = Rc::new(yarn_2);
+    /// seq.set_sequence(&[Rc::clone(&yarn_1), Rc::clone(&yarn_2)]);
+    ///
+    /// assert_eq!(seq.try_get(3).unwrap(), &yarn_2);
+    ///
+    /// seq.set_offset(1);
+    /// assert_eq!(seq.try_get(3).unwrap(), &yarn_1);
+    /// ```
+    #[must_use]
+    pub fn try_get(&self, index: usize) -> Option<&Rc<Yarn>> {
+        if self.sequence.is_empty() {
+            return None;
+        }
+        let seq_index = (self.offset + index) % self.sequence.len();
+        self.sequence.get(seq_index)
+    }
+
+    /// Gets the appropriate yarn for the given index
+    ///
+    /// # Panics
+    /// If the sequence is empty
+    #[must_use]
+    pub fn get(&self, index: usize) -> &Rc<Yarn> {
+        assert!(!self.sequence.is_empty(), "Empty YarnSequence");
+        let seq_index = (self.offset + index) % self.sequence.len();
+        &self.sequence[seq_index]
+    }
+
+    /// get offset
+    #[must_use]
+    pub fn offset(&self) -> usize {
+        self.offset
+    }
+
+    /// get sequence
+    #[must_use]
+    pub fn sequence(&self) -> &Vec<Rc<Yarn>> {
+        &self.sequence
+    }
+}
+
+/// Yarns used in the warp or weft
+#[derive(Clone, Debug, PartialEq, Default)]
+pub struct YarnSequence {
+    default_sequence: YarnRepeat,
+    exceptions: HashMap<usize, Rc<Yarn>>,
+}
+
+impl YarnSequence {
+    /// get sequence
+    #[must_use]
+    pub fn default_sequence(&self) -> &YarnRepeat {
+        &self.default_sequence
+    }
+
+    /// get exceptions to sequence
+    #[must_use]
+    pub fn exceptions(&self) -> &HashMap<usize, Rc<Yarn>> {
+        &self.exceptions
+    }
+
+    /// set sequence
+    pub fn set_default_sequence(&mut self, default_sequence: YarnRepeat) {
+        self.default_sequence = default_sequence;
+    }
+
+    /// set exceptions to sequence
+    pub fn set_exceptions(&mut self, exceptions: HashMap<usize, Rc<Yarn>>) {
+        self.exceptions = exceptions;
+    }
+
+    /// Set yarn at index
+    pub fn set_yarn(&mut self, index: usize, yarn: Rc<Yarn>) {
+        self.exceptions.insert(index, yarn);
+    }
+
+    /// Set the default repeat
+    pub fn set_repeat(&mut self, repeat: &[Rc<Yarn>]) {
+        self.default_sequence.set_sequence(repeat);
+    }
+
+    /// Set the repeat offset
+    pub fn set_offset(&mut self, offset: usize) {
+        self.default_sequence.offset = offset;
+    }
+
+    /// Get the correct yarn for the index. Returns `None` if the sequence is empty and there is no
+    /// exception for the index
+    #[must_use]
+    pub fn try_get(&self, index: usize) -> Option<&Rc<Yarn>> {
+        if self.exceptions.contains_key(&index) {
+            self.exceptions.get(&index)
+        } else {
+            self.default_sequence.try_get(index)
+        }
+    }
+
+    /// Get the correct yarn for the index.
+    /// # Panics
+    /// If the sequence is empty and there is no exception for the index
+    #[must_use]
+    pub fn get(&self, index: usize) -> &Rc<Yarn> {
+        self.exceptions
+            .get(&index)
+            .unwrap_or_else(|| self.default_sequence.get(index))
+    }
 }
 
 #[cfg(test)]
