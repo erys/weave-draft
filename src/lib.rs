@@ -56,7 +56,7 @@ pub enum WeavingAxis {
 impl Draft {
     /// Create an empty draft with the given options
     #[must_use]
-    pub fn new(shaft_count: u32, tie_up_create: TieUpCreate, rise_sink: RiseSink) -> Self {
+    pub fn new(shaft_count: usize, tie_up_create: TieUpCreate, rise_sink: RiseSink) -> Self {
         Self {
             threading: Threading::new(shaft_count, Vec::new()),
             treadling: TreadlingInfo::new(shaft_count, tie_up_create, rise_sink),
@@ -102,7 +102,7 @@ impl Draft {
 
     /// Max shaft used in threading or treadling
     #[must_use]
-    pub fn max_shaft(&self) -> (WeavingAxis, u32) {
+    pub fn max_shaft(&self) -> (WeavingAxis, usize) {
         let treadling_max = self.treadling.max_shaft_used();
         let threading_max = self.threading.max_shaft();
 
@@ -120,7 +120,7 @@ impl Draft {
     ///
     /// # Panics
     /// If shaft count is 0
-    pub fn set_shaft_count(&mut self, shaft_count: u32) -> Result<(), (WeavingAxis, u32)> {
+    pub fn set_shaft_count(&mut self, shaft_count: usize) -> Result<(), (WeavingAxis, usize)> {
         let (axis, max) = self.max_shaft();
         if shaft_count >= max {
             self.treadling.set_shaft_count(shaft_count).unwrap();
@@ -135,7 +135,11 @@ impl Draft {
     ///
     /// # Errors
     /// See [`Threading::splice`]
-    pub fn splice_threading<R>(&mut self, range: R, replace_with: &[u32]) -> Result<Vec<u32>, usize>
+    pub fn splice_threading<R>(
+        &mut self,
+        range: R,
+        replace_with: &[usize],
+    ) -> Result<Vec<usize>, usize>
     where
         R: RangeBounds<usize>,
     {
@@ -146,7 +150,7 @@ impl Draft {
     ///
     /// # Errors
     /// Returns the shaft if greater than shaft count
-    pub fn push_threading(&mut self, shaft: u32) -> Result<(), u32> {
+    pub fn push_threading(&mut self, shaft: usize) -> Result<(), usize> {
         self.threading.push(shaft)
     }
 
@@ -183,7 +187,7 @@ impl Draft {
 
     /// Get threading shaft at an index
     #[must_use]
-    pub fn get_from_threading(&self, index: usize) -> Option<&u32> {
+    pub fn get_from_threading(&self, index: usize) -> Option<&usize> {
         self.threading.get(index)
     }
 
@@ -227,7 +231,7 @@ impl Draft {
     ///
     /// # Errors
     /// If treadle is higher than number of shafts, returns treadle
-    pub fn push_single_treadling(&mut self, treadle: u32) -> Result<(), u32> {
+    pub fn push_single_treadling(&mut self, treadle: usize) -> Result<(), usize> {
         self.treadling.push_single(treadle)
     }
 
@@ -235,7 +239,7 @@ impl Draft {
     ///
     /// # Errors
     /// If any treadle is over the number of treadles/shafts, returns that value
-    pub fn push_treadling(&mut self, treadles: HashSet<u32>) -> Result<(), u32> {
+    pub fn push_treadling(&mut self, treadles: HashSet<usize>) -> Result<(), usize> {
         self.treadling.push(treadles)
     }
 
@@ -245,7 +249,7 @@ impl Draft {
     /// If treadle is invalid
     /// # Panics
     /// If index is out of bounds
-    pub fn toggle_treadle(&mut self, index: usize, treadle: Treadle) -> Result<bool, u32> {
+    pub fn toggle_treadle(&mut self, index: usize, treadle: Treadle) -> Result<bool, usize> {
         self.treadling.toggle_treadle(index, treadle)
     }
 
@@ -255,7 +259,7 @@ impl Draft {
     /// If any treadles are invalid
     /// # Panics
     /// If index is out of bounds
-    pub fn insert_treadle(&mut self, index: usize, treadles: HashSet<u32>) -> Result<(), u32> {
+    pub fn insert_treadle(&mut self, index: usize, treadles: HashSet<usize>) -> Result<(), usize> {
         self.treadling.insert(index, treadles)
     }
 
@@ -268,8 +272,8 @@ impl Draft {
     pub fn splice_treadling<R>(
         &mut self,
         range: R,
-        replace_with: Vec<HashSet<u32>>,
-    ) -> Result<Vec<HashSet<u32>>, u32>
+        replace_with: Vec<HashSet<usize>>,
+    ) -> Result<Vec<HashSet<usize>>, usize>
     where
         R: RangeBounds<usize>,
     {
@@ -285,8 +289,8 @@ impl Draft {
     pub fn put_treadling(
         &mut self,
         index: usize,
-        treadles: HashSet<u32>,
-    ) -> Result<Option<HashSet<u32>>, u32> {
+        treadles: HashSet<usize>,
+    ) -> Result<Option<HashSet<usize>>, usize> {
         self.treadling.put(index, treadles)
     }
 
