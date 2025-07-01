@@ -3,12 +3,11 @@
 use std::cmp::{Ordering, max};
 use std::collections::{HashMap, HashSet, hash_set};
 use std::hash::{Hash, Hasher};
-use std::iter::Extend;
-use std::mem;
 use std::num::FpCategory;
 use std::ops::{Add, Index, RangeBounds};
 use std::rc::Rc;
 use std::slice::SliceIndex;
+use std::{mem, vec};
 
 /// Wrapper for shaft
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -325,7 +324,7 @@ impl Threading {
 
 impl IntoIterator for Threading {
     type Item = usize;
-    type IntoIter = std::vec::IntoIter<Self::Item>;
+    type IntoIter = vec::IntoIter<Self::Item>;
 
     fn into_iter(self) -> Self::IntoIter {
         self.threading.into_iter()
@@ -1002,7 +1001,7 @@ impl Yarn {
 }
 
 /// RGB color
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Copy)]
 pub struct Color(pub u8, pub u8, pub u8);
 
 impl Color {
@@ -1024,7 +1023,7 @@ impl Color {
 }
 
 /// Thickness of a yarn
-#[derive(Clone, Debug, PartialEq, Eq, Hash, Default)]
+#[derive(Clone, Debug, PartialEq, Eq, Hash, Default, Copy)]
 pub struct Thickness {
     display_width: ValidDecimal,
     threads_per_unit: ValidDecimal,
@@ -1235,7 +1234,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_palette_borrows() {
+    fn palette_borrows() {
         let mut palette = YarnPalette::new();
         let yarn = palette.use_yarn(Yarn {
             name: None,
@@ -1252,12 +1251,12 @@ mod tests {
 
     #[test]
     #[should_panic(expected = "shaft count is 2 but found shaft 3")]
-    fn test_validate_threading() {
+    fn validate_threading() {
         let _ = Threading::new(2, vec![1, 2, 3, 4]);
     }
 
     #[test]
-    fn test_add_threading() {
+    fn add_threading() {
         let threading_1 = Threading::new(4, vec![1, 2, 3, 4]);
         let threading_2 = Threading::new(6, vec![3, 4, 5, 6, 1]);
         assert_eq!(
@@ -1267,14 +1266,14 @@ mod tests {
     }
 
     #[test]
-    fn test_thread_indexing() {
+    fn thread_indexing() {
         let threading = Threading::new(4, vec![1, 2, 3, 4]);
         assert_eq!(threading[0], 1);
         assert_eq!(threading[0..1], [1]);
     }
 
     #[test]
-    fn test_treadling_indexing() {
+    fn treadling_indexing() {
         let treadling = Treadling(vec![
             HashSet::from([1]),
             HashSet::from([2]),
@@ -1285,7 +1284,7 @@ mod tests {
     }
 
     #[test]
-    fn test_squish_threading() {
+    fn squish_threading() {
         let mut threading = Threading::new(8, vec![1, 3, 4, 6, 3]);
         assert_eq!(
             threading.trim_and_squish_shafts(),
@@ -1294,20 +1293,20 @@ mod tests {
     }
 
     #[test]
-    fn test_invert_set() {
+    fn invert_set() {
         let set = HashSet::from([1, 3, 5, 7]);
         assert_eq!(invert(&set, 8), HashSet::from([2, 4, 6, 8]));
     }
 
     #[test]
     #[should_panic(expected = "cannot invert when max is 0")]
-    fn test_invert_panic() {
+    fn invert_panic() {
         let set = HashSet::from([1, 3, 5, 7]);
         let _ = invert(&set, 0);
     }
 
     #[test]
-    fn test_invert_tie_up() {
+    fn invert_tie_up() {
         let mut tie_up = TieUp {
             treadle_count: 4,
             tie_up: vec![
