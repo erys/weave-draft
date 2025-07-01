@@ -25,6 +25,6 @@ repos:
       - id: clippy
         name: clippy
         stages: [ pre-push ]
-        entry: cargo clippy --fix -- -D warnings
+        entry: cargo clippy --all-targets --all-features --fix -- -D warnings
         language: rust
         pass_filenames: false
